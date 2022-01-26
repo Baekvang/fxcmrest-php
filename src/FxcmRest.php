@@ -1,6 +1,8 @@
 <?php
 namespace FxcmRest;
 
+use FxcmRest\Constants\HttpMethod;
+
 class FxcmRest extends \Evenement\EventEmitter {
 	private $loop;
 	private $httpClient;
@@ -10,7 +12,7 @@ class FxcmRest extends \Evenement\EventEmitter {
 	function __construct(\React\EventLoop\LoopInterface $loop, Config $config) {
 		$this->loop = $loop;
 		$this->config = $config;
-		$this->httpClient = new \React\HttpClient\Client($this->loop);
+		$this->httpClient = new \React\Http\Browser($this->loop);
 		$this->socketIO = new SocketIO($this->loop, $this->config);
 		$this->socketIO->on('connected', function() {
 			$this->emit('connected');

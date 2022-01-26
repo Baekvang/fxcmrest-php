@@ -1,5 +1,7 @@
 <?php
-namespace FxcmRest;
+namespace FxcmRest\Constants;
+
+use FxcmRest\ThirdParty;
 
 class Functions {
 	public static function checkParams($default, $input) : array {

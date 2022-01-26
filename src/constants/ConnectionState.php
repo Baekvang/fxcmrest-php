@@ -1,5 +1,7 @@
 <?php
-namespace FxcmRest;
+namespace FxcmRest\Constants;
+
+use FxcmRest\ThirdParty;
 
 class ConnectionState extends ThirdParty\BasicEnum {
 	const DISCONNECTED = 'disconnected';

@@ -1,6 +1,9 @@
 <?php
 namespace FxcmRest;
 
+use FxcmRest\Constants\Protocol;
+use FxcmRest\Constants\Functions;
+
 class Config {
 	private $config;
 	

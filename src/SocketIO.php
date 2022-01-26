@@ -1,6 +1,9 @@
 <?php
 namespace FxcmRest;
 
+use FxcmRest\Constants\ConnectionState;
+use FxcmRest\Constants\Protocol;
+
 class SocketIO extends \Evenement\EventEmitter {
 	private $loop;
 	private $config;
@@ -17,7 +20,7 @@ class SocketIO extends \Evenement\EventEmitter {
 	function __construct(\React\EventLoop\LoopInterface $loop, Config $config) {
 		$this->loop = $loop;
 		$this->config = $config;
-		$this->httpClient = new \React\HttpClient\Client($loop);
+		$this->httpClient = new \React\Http\Browser($loop);
 	}
 	
 	function connect() {
@@ -40,16 +43,19 @@ class SocketIO extends \Evenement\EventEmitter {
 	}
 	
 	private function handshake() {
-		$request = $this->httpClient->request('GET', "{$this->config->url()}/socket.io/?EIO=3&transport=polling&agent=fxcmrest-php&access_token={$this->config->token()}");
-		$request->on('response', [$this, 'handshakeResponse']);
-		$request->on('error', function (\Exception $e) {
-			$this->state = ConnectionState::CONNECTION_ERROR;
-			$this->emit('error', [$e->getMessage()]);
-		});
-		$request->end();
+		$request = $this->httpClient
+			->get("{$this->config->url()}/socket.io/?EIO=3&transport=polling&agent=fxcmrest-php&access_token={$this->config->token()}")
+			->then(function(Psr\Http\Message\ResponseInterface $response) {
+
+			    $this->handshakeResponse($response);
+
+			}, function (\Exception $e) {
+				$this->state = ConnectionState::CONNECTION_ERROR;
+				$this->emit('error', [$e->getMessage()]);
+			});
 	}
 	
-	public function handshakeResponse($response) { // TODO: this must be public for callbacks to work. look into pimpl
+	public function handshakeResponse($response) {
 		$response->on('data', function ($chunk) use (&$data) {
 			$data .= $chunk;
 		});
@@ -135,7 +141,7 @@ class SocketIO extends \Evenement\EventEmitter {
 		}
 		$package .= $mask;
 		$package .= $data;
-		// echo \hex_dump($package); // debug
+
 		$this->socket->write($package);
 	}
 	
