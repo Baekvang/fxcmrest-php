@@ -1,13 +1,13 @@
 {
-	"name": "Baekvang/fxcmrest",
+	"name": "fxcm/fxcmrest",
 	"description": "FXCM Rest API library for php",
 	"type": "library",
 	"license": "MIT",
-	"homepage": "https://github.com/Baekvang/fxcmrest-php",
+	"homepage": "https://fxcm.github.io/fxcmrest-php/",
 	"authors": [
 		{
-			"name": "Anders Bækvang",
-			"email": "anders@baekvang.dk"
+			"name": "Pawel Guz",
+			"email": "pguz@fxcm.com"
 		}
 	],
 	"require": {
