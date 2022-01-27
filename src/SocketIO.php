@@ -45,9 +45,9 @@ class SocketIO extends \Evenement\EventEmitter {
 	private function handshake() {
 		$request = $this->httpClient
 			->get("{$this->config->url()}/socket.io/?EIO=3&transport=polling&agent=fxcmrest-php&access_token={$this->config->token()}")
-			->then(function(Psr\Http\Message\ResponseInterface $response) {
+			->then(function(\Psr\Http\Message\ResponseInterface $response) {
 
-			    $this->handshakeResponse($response);
+			    $this->handshakeResponse($response->getBody());
 
 			}, function (\Exception $e) {
 				$this->state = ConnectionState::CONNECTION_ERROR;
@@ -55,20 +55,15 @@ class SocketIO extends \Evenement\EventEmitter {
 			});
 	}
 	
-	public function handshakeResponse($response) {
-		$response->on('data', function ($chunk) use (&$data) {
-			$data .= $chunk;
-		});
-		$response->on('end', function() use (&$data) {
-			$first = stripos($data,"{");
-			$len =  strripos($data,"}") - $first + 1;
-			$data = substr($data, $first, $len);
-			$this->options = json_decode($data);
-			// var_dump($this->options);
-			$connector = new \React\Socket\Connector($this->loop);
-			$proto = $this->config->protocol() === Protocol::HTTPS ? "tls://" : "tcp://";
-			$connector->connect("{$proto}{$this->config->host()}:{$this->config->port()}")->then([$this, 'upgradeSocket']);
-		});
+	public function handshakeResponse($data) {
+		$first = stripos($data,"{");
+		$len =  strripos($data,"}") - $first + 1;
+		$data = substr($data, $first, $len);		
+		$this->options = json_decode($data);
+
+		$connector = new \React\Socket\Connector($this->loop);
+		$proto = $this->config->protocol() === Protocol::HTTPS ? "tls://" : "tcp://";
+		$connector->connect("{$proto}{$this->config->host()}:{$this->config->port()}")->then([$this, 'upgradeSocket']);
 	}
 	
 	public function upgradeSocket(\React\Socket\ConnectionInterface $connection) {

@@ -12,18 +12,23 @@ class FxcmRest extends \Evenement\EventEmitter {
 	function __construct(\React\EventLoop\LoopInterface $loop, Config $config) {
 		$this->loop = $loop;
 		$this->config = $config;
-		$this->httpClient = new \React\Http\Browser($this->loop);
+		$this->connector = new \React\Socket\Connector($loop);
+		$this->httpClient = new \React\Http\Browser($this->connector, $loop);
 		$this->socketIO = new SocketIO($this->loop, $this->config);
+
 		$this->socketIO->on('connected', function() {
 			$this->emit('connected');
 		});
+
 		$this->socketIO->on('data', function($data) {
 			$json = json_decode($data);
 			$this->emit($json[0], [$json[1]]);
 		});
+
 		$this->socketIO->on('error', function($e) {
 			$this->emit('error', [$e]);
 		});
+
 		$this->socketIO->on('disconnected', function() {
 			$this->emit('disconnected');
 		});
@@ -59,19 +64,29 @@ class FxcmRest extends \Evenement\EventEmitter {
 		} else if ($method === HttpMethod::GET && $arguments) {
 			$url .= "?" . $arguments;
 		}
-		$request = $this->httpClient->request($method, $url, $headers, '1.1');
-		$request->on('response', function ($response) use ($data, $callback) {
-			$response->on('data', function ($chunk) use (&$data) {
-				$data .= $chunk;
+
+		$request = $this->httpClient
+			->requestStreaming($method, $url, $headers)
+			->then(function (\Psr\Http\Message\ResponseInterface $response) use ($data, $callback) {
+			    $body = $response->getBody();
+			   
+			    assert($body instanceof \Psr\Http\Message\StreamInterface);
+			    assert($body instanceof \React\Stream\ReadableStreamInterface);
+
+			    $body->on('data', function ($chunk) use (&$data) {
+			        $data .= $chunk;
+			    });
+
+			    $body->on('error', function (Exception $error) {
+			        echo 'Error: ' . $error->getMessage() . PHP_EOL;
+			    });
+
+			    $body->on('close', function () use (&$data, $callback, $response) {
+			        $callback($response->getStatusCode(), $data);
+			    });
+			}, function(\Exception $e) use ($callback) {
+				$callback(0, $e);
 			});
-			$response->on('end', function () use (&$data, $callback, $response) {
-				$callback($response->getCode(), $data);
-			});
-		});
-		$request->on('error', function (\Exception $e) use ($callback) {
-			$callback(0,$e);
-		});
-		$request->end($end);
 	}
 }
 ?>
