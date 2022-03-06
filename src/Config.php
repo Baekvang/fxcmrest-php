@@ -14,7 +14,7 @@ class Config {
 			'port' => 443,
 			'path' => '',
 			'token' => '',
-			'autoreconnect' => false,
+			'autoreconnect' => true, // was false
 		];
 		$this->config = Functions::checkParams($defaults, $arguments);
 		

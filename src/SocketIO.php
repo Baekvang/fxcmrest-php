@@ -4,6 +4,8 @@ namespace FxcmRest;
 use FxcmRest\Constants\ConnectionState;
 use FxcmRest\Constants\Protocol;
 
+use Illuminate\Support\Facades\Log;
+
 class SocketIO extends \Evenement\EventEmitter {
 	private $loop;
 	private $config;
@@ -60,6 +62,7 @@ class SocketIO extends \Evenement\EventEmitter {
 		$len =  strripos($data,"}") - $first + 1;
 		$data = substr($data, $first, $len);		
 		$this->options = json_decode($data);
+		// var_dump($this->options);
 
 		$connector = new \React\Socket\Connector($this->loop);
 		$proto = $this->config->protocol() === Protocol::HTTPS ? "tls://" : "tcp://";
@@ -98,7 +101,7 @@ class SocketIO extends \Evenement\EventEmitter {
 		// TODO: check if response is valid
 		// ? $array = preg_split('/$\R?^/m', $data);
 		
-		// echo "upgradeResponse: " . $data . "\n";
+		// Log::debug("upgradeResponse: " . $data);
 
 		$this->socket->on('data', [$this, 'wsdata']);
 		$this->wssend("2probe");
@@ -142,46 +145,52 @@ class SocketIO extends \Evenement\EventEmitter {
 	
 	public function startPinging() {
 		$this->loop->addPeriodicTimer($this->options->pingInterval / 1000, function($timer) {
+			// Log::debug('Pinging the server');
 			$this->wssend("2");
 		});
 	}
 	
 	public function wsdata(string $package) {
-		$header = 2;
-		$fin = (ord($package[0]) & 0b10000000) / 0b10000000 ;
-		$opcode = ord($package[0]) & 0b00001111;
-		$isMasked = (ord($package[1]) & 0b10000000) / 0b10000000;
-		$len = ord($package[1]) & 0b01111111;
-		if($len == 126) {
-			$header += 2;
-			$len = (ord($package[2]) * 256) + ord($package[3]);
-		} else if ($len == 127) {
-			$header += 8;
-			$len = 0;
-			for($i = 2; $i < $header; $i++) {
-				$len = ($len * 256) + ord($package[$i]);
-			}
-		}
-		if($isMasked) {
-			$mask = substr($package, $header, 4);
-			$header += 4;
-		}
-		if($header + $len > strlen($package)) {
-			throw new \Exception("package shorter than header specified");
-		} else {
-			if($isMasked) {
-				for($i = $header; $i < $len + $header; $i++) {
-					$package[$i] = $package[$i] ^ $mask[$i % 4];
+		do {
+			// Log::debug($package);
+			$header = 2;
+			$fin = (ord($package[0]) & 0b10000000) / 0b10000000 ;
+			$opcode = ord($package[0]) & 0b00001111;
+			$isMasked = (ord($package[1]) & 0b10000000) / 0b10000000;
+			$len = ord($package[1]) & 0b01111111;
+			if($len == 126) {
+				$header += 2;
+				$len = (ord($package[2]) * 256) + ord($package[3]);
+			} else if ($len == 127) {
+				$header += 8;
+				$len = 0;
+				for($i = 2; $i < $header; $i++) {
+					$len = ($len * 256) + ord($package[$i]);
 				}
 			}
-			$this->eiodata(substr($package, $header, $len));
-			if($header + $len < strlen($package)) {
-				$this->wsdata(substr($package, $header + $len));
+			if($isMasked) {
+				$mask = substr($package, $header, 4);
+				$header += 4;
 			}
-		}
+			if($header + $len > strlen($package)) {
+				throw new \Exception("package shorter than header specified");
+			} else {
+				if($isMasked) {
+					for($i = $header; $i < $len + $header; $i++) {
+						$package[$i] = $package[$i] ^ $mask[$i % 4];
+					}
+				}
+				$this->eiodata(substr($package, $header, $len));
+				// if($header + $len < strlen($package)) {
+				// 	$this->wsdata(substr($package, $header + $len));
+				// }
+				$package = substr($package, $header + $len);
+			}
+		} while($header + $len < strlen($package));
 	}
 	
 	public function eiodata(string $package) {
+		if(empty($package[0])) return;
 		if($package[0] === "4") {
 			$this->siodata($package);
 		} else if ($package[0] === "3") {

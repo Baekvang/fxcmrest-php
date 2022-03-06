@@ -3,6 +3,8 @@ namespace FxcmRest;
 
 use FxcmRest\Constants\HttpMethod;
 
+use Illuminate\Support\Facades\Log;
+
 class FxcmRest extends \Evenement\EventEmitter {
 	private $loop;
 	private $httpClient;
@@ -14,9 +16,10 @@ class FxcmRest extends \Evenement\EventEmitter {
 		$this->config = $config;
 		$this->connector = new \React\Socket\Connector($loop);
 		$this->httpClient = new \React\Http\Browser($this->connector, $loop);
-		$this->socketIO = new SocketIO($this->loop, $this->config);
+		$this->socketIO = new SocketIO($loop, $this->config);
 
 		$this->socketIO->on('connected', function() {
+			Log::debug('connected');
 			$this->emit('connected');
 		});
 
@@ -45,11 +48,16 @@ class FxcmRest extends \Evenement\EventEmitter {
 	function socketID() : string {
 		return $this->socketIO->socketID();
 	}
+
+	function pingServer() {
+		$this->socketIO->wssend("2");
+	}
 	
 	function request(string $method, string $path, array $arguments, callable $callback) {
 		$data = '';
 		$url = $this->config->url() . $path;
 		$arguments = http_build_query($arguments);
+
 		$headers =[
 			'User-Agent' => 'request',
 			'Accept' => 'application/json',
@@ -66,7 +74,7 @@ class FxcmRest extends \Evenement\EventEmitter {
 		}
 
 		$request = $this->httpClient
-			->requestStreaming($method, $url, $headers)
+			->requestStreaming($method, $url, $headers, $end)
 			->then(function (\Psr\Http\Message\ResponseInterface $response) use ($data, $callback) {
 			    $body = $response->getBody();
 			   
